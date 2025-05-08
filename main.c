@@ -28,14 +28,16 @@ typedef struct {
 
 // Dados passados para cada thread
 typedef struct {
-    const char *data;    // Ponteiro para os dados mapeados
-    size_t start;        // Offset inicial
-    size_t end;          // Offset final
-    StatsEntry *stats;   // Tabela hash local da thread
+    const char *data;               // Ponteiro para os dados mapeados
+    size_t start;                   // Offset inicial
+    size_t end;                     // Offset final
+    StatsEntry *stats;              // Tabela hash local da thread
+    const char *year_month_filter;  // Filtro YYYY-MM (argv[2])
+    size_t filesize;                // Tamanho total do arquivo
 } ThreadData;
 
 // Funcao para processar um bloco do arquivo
-void process_region(const char *data, size_t start, size_t end, StatsEntry **stats) {
+void process_region(const char *data, size_t start, size_t end, const char *year_month_filter, size_t filesize, StatsEntry **stats) {
     size_t i = start;
 
     // Ajusta o inicio para comecar no proximo '\n' (se o chunk resultar no meio de uma linha)
@@ -44,12 +46,18 @@ void process_region(const char *data, size_t start, size_t end, StatsEntry **sta
         if (i < end) i++;
     }
 
-    while (i < end) {
+    size_t adjusted_end = end;
+    if (adjusted_end != filesize) {
+        while (adjusted_end < filesize && data[adjusted_end] != '\n') adjusted_end++; // Resolve o problema da quebra de linha no final do chunk
+        if (adjusted_end < filesize) adjusted_end++; // Inclui o '\n'
+    }
+
+    while (i < adjusted_end) {
         size_t line_start = i;
         size_t line_end = i;
 
         // Encontra o fim da linha atual (estabele intervalo para processamento)
-        while (line_end < end && data[line_end] != '\n') line_end++;
+        while (line_end < adjusted_end && data[line_end] != '\n') line_end++;
 
         size_t tokens_start[12];
         size_t tokens_len[12];
@@ -81,7 +89,7 @@ void process_region(const char *data, size_t start, size_t end, StatsEntry **sta
             ym_str[7] = '\0';
 
             // Filtra datas >= YYYY-MM usando "comparacao direta" (tchau MALDITO sscanf())
-            if (strncmp(ym_str, argv[2], 7) >= 0) {
+            if (strncmp(ym_str, year_month_filter, 7) >= 0) {
                 // Processa cada sensor
                 const int sensor_indices[] = {4,5,6,7,8,9};
                 const char* sensor_names[] = {"temperatura", "umidade", "luminosidade", "ruido", "eco2", "etvoc"};
@@ -148,7 +156,7 @@ void process_region(const char *data, size_t start, size_t end, StatsEntry **sta
 void *thread_func(void *arg) {
     ThreadData *td = (ThreadData *)arg;
     td->stats = NULL;
-    process_region(td->data, td->start, td->end, &td->stats);
+    process_region(td->data, td->start, td->end, td->year_month_filter, td->filesize, &td->stats);
     return NULL;
 }
 
@@ -187,6 +195,8 @@ int main(int argc, char **argv) {
         td[i].data = data;
         td[i].start = i * chunk;
         td[i].end = (i == nthreads - 1) ? filesize : (i + 1) * chunk;
+        td[i].year_month_filter = argv[2]; // Passa o filtro YYYY-MM
+        td[i].filesize = filesize;         // Passa o tamanho total
         pthread_create(&threads[i], NULL, thread_func, &td[i]);
     }
 
@@ -246,5 +256,6 @@ int main(int argc, char **argv) {
     // Limpeza final
     munmap(data, filesize);
     close(fd);
+    printf("finished.\n");
     return 0;
 }
