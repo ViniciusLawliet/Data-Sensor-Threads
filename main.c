@@ -32,10 +32,11 @@ typedef struct {
     size_t start;        // Offset inicial
     size_t end;          // Offset final
     StatsEntry *stats;   // Tabela hash local da thread
+    char date_prefix[MAX_YM_LEN + 1]; // data para comparação e verificação da data
 } ThreadData;
 
 // Funcao para processar um bloco do arquivo
-void process_region(const char *data, size_t start, size_t end, StatsEntry **stats) {
+void process_region(const char *data, size_t start, size_t end, StatsEntry **stats, const char *date_prefix) {
     size_t i = start;
 
     // Ajusta o inicio para comecar no proximo '\n' (se o chunk resultar no meio de uma linha)
@@ -48,7 +49,7 @@ void process_region(const char *data, size_t start, size_t end, StatsEntry **sta
         size_t line_start = i;
         size_t line_end = i;
 
-        // Encontra o fim da linha atual (estabele intervalo para processamento)
+        // Encontra o fim da linha atual (estabelece intervalo para processamento)
         while (line_end < end && data[line_end] != '\n') line_end++;
 
         size_t tokens_start[12];
@@ -81,7 +82,7 @@ void process_region(const char *data, size_t start, size_t end, StatsEntry **sta
             ym_str[7] = '\0';
 
             // Filtra datas >= YYYY-MM usando "comparacao direta" (tchau MALDITO sscanf())
-            if (strncmp(ym_str, argv[2], 7) >= 0) {
+            if (strncmp(ym_str, date_prefix, 7) >= 0) {
                 // Processa cada sensor
                 const int sensor_indices[] = {4,5,6,7,8,9};
                 const char* sensor_names[] = {"temperatura", "umidade", "luminosidade", "ruido", "eco2", "etvoc"};
@@ -148,13 +149,13 @@ void process_region(const char *data, size_t start, size_t end, StatsEntry **sta
 void *thread_func(void *arg) {
     ThreadData *td = (ThreadData *)arg;
     td->stats = NULL;
-    process_region(td->data, td->start, td->end, &td->stats);
+    process_region(td->data, td->start, td->end, &td->stats, td->date_prefix);
     return NULL;
 }
 
 int main(int argc, char **argv) {
     if (argc != 3) {
-        fprintf(stderr, "Uso: %s <arquivo_entrada.csv> <YYYY-MM>\n", argv[0]); // necessario adicionar verificacao de entradas?
+        fprintf(stderr, "Uso: %s <arquivo_entrada.csv> <YYYY-MM>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
@@ -180,12 +181,14 @@ int main(int argc, char **argv) {
     // Info
     printf("available processors:\t\t %d\n", nthreads);
     printf("file size (bytes):\t\t %zu\n", filesize);
-    printf("~chunk size (bytes):\t\t %zu\n", chunk);
+    printf("chunk size (bytes):\t\t %zu\n", chunk);
 
     printf("\nprocessing file...\n");
     for (int i = 0; i < nthreads; i++) {
         td[i].data = data;
         td[i].start = i * chunk;
+        strncpy(td[i].date_prefix, argv[2], MAX_YM_LEN);
+        td[i].date_prefix[MAX_YM_LEN] = '\0';
         td[i].end = (i == nthreads - 1) ? filesize : (i + 1) * chunk;
         pthread_create(&threads[i], NULL, thread_func, &td[i]);
     }

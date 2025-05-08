@@ -4,7 +4,7 @@ Este projeto realiza a análise de dados de sensores IoT utilizando programaçã
 
 ---
 
-## ✅ Requisitos Atendidos
+## Requisitos Atendidos
 
 - Código em C utilizando `pthreads`;
 - Número de threads determinado automaticamente com base nos núcleos disponíveis;
@@ -14,16 +14,15 @@ Este projeto realiza a análise de dados de sensores IoT utilizando programaçã
 
 ---
 
-## 🧪 Compilação
+## Compilação
 
 Para compilar o programa:
 
 ```bash
-gcc -O2 -pthread -o analisador main.c
+gcc -Iinclude -pthread -o analisador main.c
 ```
 
-
-## ▶️ Execução
+## Execução
 
 Execute o programa com:
 
@@ -37,11 +36,11 @@ Exemplo:
 ./analisador sensores.csv 2024-03
 ```
 
-## 📥 Como o CSV é carregado
+## Como o CSV é carregado
 
 O arquivo CSV é lido usando fopen, que permite buffer interno e facilita a leitura por linha. Cada thread abre sua própria instância de leitura para evitar conflitos de ponteiro.
 
-## 🔀 Distribuição entre Threads
+## Distribuição entre Threads
 
 - O arquivo é dividido em blocos de bytes proporcionalmente ao número de processadores disponíveis;
 - Cada thread recebe um "chunk" (parte) do arquivo para processar;
@@ -49,7 +48,7 @@ O arquivo CSV é lido usando fopen, que permite buffer interno e facilita a leit
     - No início do chunk, a thread avança até a próxima linha válida;
     - No fim do chunk, ela retrocede até o início da linha anterior.
 
-## 🧠 Processamento por Thread
+## Processamento por Thread
 
 Cada thread executa:
 
@@ -61,7 +60,7 @@ Cada thread executa:
 - Cálculo dos valores:
     - `valor_minimo`, `valor_médio`, `valor_maximo`.  
 
-## 📤 Geração do CSV de Saída
+## Geração do CSV de Saída
 
 Após o término do processamento:
 
@@ -73,33 +72,41 @@ Após o término do processamento:
 ```
 Este arquivo é salvo no diretório local do programa.
 
-## 💻 Execução das Threads
+## Execução das Threads
 As threads são criadas com a biblioteca POSIX pthreads, executadas em modo usuário.
 
-## ⚠️ Concorrência
+## Concorrência
 Se for usada uma estrutura global compartilhada entre threads (como um dicionário ou hash map para estatísticas), será necessário:
 
 - Controlar o acesso com mutexes para evitar condições de corrida.
 
 Para simplificação e desempenho, cada thread pode usar sua própria estrutura de agregação local e passar os resultados para a thread principal consolidar ao final.
 
-## 📌 Observações
+## Observações
 - As colunas **id**, **latitude** e **longitude** não são consideradas na análise.
 
 - O cabeçalho do CSV é descartado automaticamente.
 
-## 📁 Estrutura do Repositório
+## Dependências
 
-```graphql
-    📁 projeto-sensores/
-    ├── analisador.c               # Código-fonte principal
-    ├── README.md                  # Este arquivo
-    ├── sensores.csv               # Exemplo de base de entrada (não incluído no repositório)
-    └── resultados/
-        └── saida.csv              # Arquivo CSV gerado com os resultados
-```
+Este projeto utiliza a biblioteca [uthash](https://github.com/troydhanson/uthash), que já está incluída no repositório dentro do diretório `include/`.
 
-## 🔗 Base de Dados
+- `uthash` é uma biblioteca **header-only**, ou seja, não precisa ser compilada ou instalada.
+- Arquivo utilizado: `include/uthash.h`
+
+## Utilização de mmap
+
+Optamos por utilizar mmap() para processar o arquivo CSV de forma eficiente, devido aos seguintes motivos:
+
+- Desempenho e grandes volumes de dados: O arquivo pode ser grande, e usar mmap() permite acessar diretamente a memória mapeada, evitando chamadas repetitivas de read() ou fgets(). Isso resulta em menor sobrecarga de I/O e processamento mais rápido.
+
+- Acesso direto à memória: Ao mapear o arquivo para memória, podemos tratar o conteúdo como um array contínuo de dados. Isso facilita o acesso rápido e direto, sem a necessidade de buffers intermediários, como ocorre com fopen()/fgets().
+
+- Paralelização eficiente: Com o arquivo mapeado em memória, podemos dividir o trabalho entre múltiplas threads de maneira eficiente, processando diferentes partes do arquivo simultaneamente. A utilização de pointers diretamente na memória elimina a necessidade de coordenação complexa de buffers, o que seria mais complicado com fopen().
+
+- Controle sobre o formato do arquivo: Como o arquivo possui uma estrutura bem definida, não há a necessidade de funções de leitura automáticas (como fscanf() ou fgets()), permitindo o controle manual sobre a forma como os dados são processados, o que é facilmente gerido com mmap().
+
+## Base de Dados
 A base utilizada para análise está disponível em:
 
 [📥 Download da base (Google Drive)](https://drive.google.com/file/d/1fEbhm19z0zH6wS7QZU4t8e0WxrPk6awm/view?usp=sharing)

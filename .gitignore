@@ -1,4 +1,5 @@
 *.csv
 *.exe
 analisador
+results.csv
 temp.txt
