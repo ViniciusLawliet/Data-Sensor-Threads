@@ -108,25 +108,29 @@ Exemplo:
     3. Filtra registros a partir do prefixo data informado pelo usuario via argumento, processa se ano-mes >= 'YYYY-MM'.
     4. Para cada sensor (temperatura, umidade, luminosidade, ruido, eco2, etvoc):
        - Converte valor com strtod().
-       - Compoe chave composta (device|YYYY-MM|sensor).
+       - Compoe chave composta (`device|YYYY-MM|sensor`).
        - Atualiza ou cria entrada na hash local: soma, count, min, max.
 
 ## 4. Consolidação de Estatísticas
 
 Após todas as threads terminarem (pthread_join), a thread principal faz merge das tabelas locais:
-    1. Para cada entrada de cada thread:
-        - Busca a chave em uma tabela global (global_stats).
-        - Se existir: acumula sum e count, ajusta min/max.
-        - Caso contrário: adiciona a entrada diretamente na tabela global.
-    2. Libera as estruturas locais à medida que são movidas ou consolidadas.
+1. Para cada entrada de cada thread:
+    - Busca a chave em uma tabela global (global_stats).
+    - Se existir: acumula sum e count, ajusta min/max.
+    - Caso contrário: adiciona a entrada diretamente na tabela global.
+2. Libera as estruturas locais à medida que são movidas ou consolidadas.
 
 ## Geração do CSV de Saída
 
 Abre um arquivo texto `results.csv` em modo de escrita.
 - Imprime cabeçalho:
-    - fprintf(of, "device|ano-mes|sensor|valor_maximo|valor_medio|valor_minimo\n");
+    ```  
+    fprintf(of, "device|ano-mes|sensor|valor_maximo|valor_medio|valor_minimo\n");
+    ```
 - Itera sobre global_stats, calcula média (sum/count) e escreve linha formatada:
-    -  fprintf(of, "%s|%s|%s|%.1f|%.1f|%.1f\n", ...);
+    ```
+    fprintf(of, "%s|%s|%s|%.1f|%.1f|%.1f\n", ...);
+    ```
 
 ## Observações
 - As colunas **id**, **latitude** e **longitude** não são consideradas na análise.
